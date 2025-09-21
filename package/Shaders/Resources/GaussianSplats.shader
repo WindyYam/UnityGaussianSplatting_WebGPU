@@ -84,7 +84,7 @@ v2f vert (uint vtxID : SV_VertexID, uint instID : SV_InstanceID)
 
 		// motion (NDC delta) -- reconstruct previous vertex clip pos similarly
 		o.vel = 0;
-		if (sgu_hasPrev != 0)
+		if (sgu_transparencyMode != 0 && sgu_hasPrev != 0)
 		{
 			SplatViewData prevView = _PrevSplatViewData[instID];
 			if (prevView.pos.w > 0)
@@ -169,11 +169,10 @@ FragOut frag (v2f i)
         uint3 coord = uint3(i.vertex.x, i.vertex.y, i.idx);
         uint3 hash = pcg3d16(coord);
         half cutoff = (hash.x & 0xFFFF) / 65535.0;
-
-        o.motion = (sgu_hasPrev != 0) ? half2(i.vel) : half2(0,0);
         if (alpha <= cutoff)
             discard;
         alpha = 1;
+        o.motion = (sgu_hasPrev != 0) ? half2(i.vel) : half2(0,0);
     }
     o.col = half4(i.col.rgb, alpha);
     return o;
