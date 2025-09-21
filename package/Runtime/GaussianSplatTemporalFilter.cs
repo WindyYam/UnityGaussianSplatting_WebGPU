@@ -15,6 +15,7 @@ namespace GaussianSplatting.Runtime
             public static readonly int _TaaAccumulationTex = Shader.PropertyToID("_TaaAccumulationTex");
             public static readonly int _TaaFrameInfluence     = Shader.PropertyToID("_TaaFrameInfluence");
             public static readonly int _TaaVarianceClampScale = Shader.PropertyToID("_TaaVarianceClampScale");
+            public static readonly int _TaaMotionVectorTex = Shader.PropertyToID("_TaaMotionVectorTex");
         }
 
         int m_CurWidth = -1, m_CurHeight = -1;
@@ -37,7 +38,8 @@ namespace GaussianSplatting.Runtime
             RenderTargetIdentifier srcSplatColor,
             RenderTargetIdentifier dstComposedColor,
             float frameInfluence,
-            float varianceClampScale)
+            float varianceClampScale,
+            RenderTargetIdentifier motionVectorTex)
         {
             int screenW = camera.pixelWidth, screenH = camera.pixelHeight;
             int eyeW = XRSettings.eyeTextureWidth, eyeH = XRSettings.eyeTextureHeight;
@@ -70,6 +72,7 @@ namespace GaussianSplatting.Runtime
             material.SetFloat(Props._TaaFrameInfluence, taaFrameInfluence);
             material.SetFloat(Props._TaaVarianceClampScale, varianceClampScale);
             material.SetTexture(Props._TaaAccumulationTex, m_AccumulationTexture);
+            cmb.SetGlobalTexture(Props._TaaMotionVectorTex, motionVectorTex); // bind motion vector texture
             cmb.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3, 1);
 
             // copy temp buffer -> into history

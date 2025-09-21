@@ -48,7 +48,7 @@ half Max3(half a, half b, half c) { return max(max(a, b), c); }
 Texture2D _CameraDepthTexture;
 Texture2D _GaussianSplatRT;
 float4 _GaussianSplatRT_TexelSize;
-Texture2D _TaaMotionVectorTex;
+Texture2D _TaaMotionVectorTex; // RG motion (alpha-weighted NDC delta from previous to current)
 Texture2D _TaaAccumulationTex;
 
 cbuffer TemporalAAData {
@@ -63,9 +63,10 @@ SamplerState sampler_LinearClamp, sampler_PointClamp;
 // Per-pixel camera backwards velocity
 half2 GetVelocityWithOffset(float2 uv, half2 depthOffsetUv)
 {
-    // Unity motion vectors are forward motion vectors in screen UV space
-    half2 offsetUv = _TaaMotionVectorTex.Sample(sampler_LinearClamp, uv + _TaaMotionVectorTex_TexelSize.xy * depthOffsetUv).xy;
-    return -offsetUv;
+    half2 mv = _TaaMotionVectorTex.Sample(sampler_LinearClamp, uv + _TaaMotionVectorTex_TexelSize.xy * depthOffsetUv).xy;
+    // NDC to UV: uv = ndc*0.5 + 0.5, but UV y grows up in our splat NDC while texture UV.y grows down, so flip Y.
+    half2 vel = half2(mv.x * 0.5, -mv.y * 0.5);
+    return vel;
 }
 
 void AdjustBestDepthOffset(inout half bestDepth, inout half bestX, inout half bestY, float2 uv, half currX, half currY)
@@ -318,7 +319,6 @@ half4 DoTemporalAA(float2 uv, int clampQuality, int motionQuality, int historyQu
         boxMax = min(boxMax, devMax);
     }
 
-    /* @TODO motion stuff
     half bestOffsetX = 0.0f;
     half bestOffsetY = 0.0f;
     half bestDepth = 1.0f;
@@ -339,12 +339,8 @@ half4 DoTemporalAA(float2 uv, int clampQuality, int motionQuality, int historyQu
     }
 
     half2 depthOffsetUv = half2(bestOffsetX, bestOffsetY);
-    half2 velocity = GetVelocityWithOffset(uv, depthOffsetUv);
-
-    float2 historyUv = uv + velocity * float2(1, 1);
-    */
-
-    float2 historyUv = uv; //@TODO: for now assume no motion at all
+    half2 velocity = GetVelocityWithOffset(uv, depthOffsetUv); // already current-prev in UV space
+    float2 historyUv = uv - velocity; // sample previous frame at previous location
 
     half4 accumulation = (historyQuality >= 2) ?
         SampleBicubic5TapHalf(_TaaAccumulationTex, historyUv, _TaaAccumulationTex_TexelSize.xyzw) :

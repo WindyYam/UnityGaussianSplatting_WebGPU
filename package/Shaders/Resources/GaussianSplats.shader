@@ -26,12 +26,14 @@ CGPROGRAM
 #include "GaussianSplatting.hlsl"
 
 StructuredBuffer<uint> _OrderBuffer;
+StructuredBuffer<SplatViewData> _PrevSplatViewData; // previous frame per-splat view data
 
 struct v2f
 {
     half4 col : COLOR0;
     float2 pos : TEXCOORD0;
-	uint idx : TEXCOORD1;
+    uint idx : TEXCOORD1;
+    float2 vel : TEXCOORD2; // NDC motion delta (current - previous)
     float4 vertex : SV_POSITION;
 };
 
@@ -42,6 +44,8 @@ cbuffer SplatGlobalUniforms // match struct SplatGlobalUniforms in C#
 {
 	uint sgu_transparencyMode;
 	uint sgu_frameOffset;
+	uint sgu_hasPrev; // 1 if previous frame data valid
+	uint sgu_pad0;
 }
 
 StructuredBuffer<SplatViewData> _SplatViewData;
@@ -78,7 +82,23 @@ v2f vert (uint vtxID : SV_VertexID, uint instID : SV_InstanceID)
 		o.vertex = centerClipPos;
 		o.vertex.xy += deltaScreenPos * centerClipPos.w;
 
-		// is this splat selected?
+		// motion (NDC delta) -- reconstruct previous vertex clip pos similarly
+		o.vel = 0;
+		if (sgu_hasPrev != 0)
+		{
+			SplatViewData prevView = _PrevSplatViewData[instID];
+			if (prevView.pos.w > 0)
+			{
+				float4 prevClipPos = prevView.pos;
+				float2 prevDeltaScreenPos = (quadPos.x * prevView.axis1 + quadPos.y * prevView.axis2) * 2 / _ScreenParams.xy;
+				prevClipPos.xy += prevDeltaScreenPos * prevClipPos.w;
+				float2 ndcCurr = o.vertex.xy / max(o.vertex.w, 1e-6);
+				float2 ndcPrev = prevClipPos.xy / max(prevClipPos.w, 1e-6);
+				o.vel = ndcCurr - ndcPrev; // current - previous
+			}
+		}
+
+		// selection check
 		if (_SplatBitsValid)
 		{
 			uint wordIdx = instID / 32;
@@ -112,52 +132,51 @@ uint3 pcg3d16(uint3 v)
     return v;
 }
 
-half4 frag (v2f i) : SV_Target
+struct FragOut { half4 col : SV_Target0; half2 motion : SV_Target1; };
+
+FragOut frag (v2f i)
 {
-	float power = -dot(i.pos, i.pos);
-	half alpha = exp(power);
-	if (i.col.a >= 0)
-	{
-		alpha = saturate(alpha * i.col.a);
-	}
-	else
-	{
-		// "selected" splat: magenta outline, increase opacity, magenta tint
-		half3 selectedColor = half3(1,0,1);
-		if (alpha > 7.0/255.0)
-		{
-			if (alpha < 10.0/255.0)
-			{
-				alpha = 1;
-				i.col.rgb = selectedColor;
-			}
-			alpha = saturate(alpha + 0.3);
-		}
-		i.col.rgb = lerp(i.col.rgb, selectedColor, 0.5);
-	}
-	
+    FragOut o; o.col = 0; o.motion = 0;
+    float power = -dot(i.pos, i.pos);
+    half alpha = exp(power);
+    if (i.col.a >= 0)
+    {
+        alpha = saturate(alpha * i.col.a);
+    }
+    else
+    {
+        half3 selectedColor = half3(1,0,1);
+        if (alpha > 7.0/255.0)
+        {
+            if (alpha < 10.0/255.0)
+            {
+                alpha = 1;
+                i.col.rgb = selectedColor;
+            }
+            alpha = saturate(alpha + 0.3);
+        }
+        i.col.rgb = lerp(i.col.rgb, selectedColor, 0.5);
+    }
     if (alpha < 1.0/255.0)
         discard;
 
-	if (sgu_transparencyMode == 0)
-	{
-		i.col.rgb *= alpha;
-	}
-	else
-	{
-		// "Hashed Alpha Testing", Wyman, McGuire 2017
-		// https://casual-effects.com/research/Wyman2017Hashed/index.html
-		// Uses pcg3d16 hash from https://jcgt.org/published/0009/03/02/
-		uint3 coord = uint3(i.vertex.x, i.vertex.y, i.idx);
-		uint3 hash = pcg3d16(coord);
-		half cutoff = (hash.x & 0xFFFF) / 65535.0;
-		if (alpha <= cutoff)
-			discard;
-		//alpha = i.vertex.z / i.vertex.w; //@TODO: write depth to alpha for when we'll start doing motion
-		alpha = 1;
-	}
-    half4 res = half4(i.col.rgb, alpha);
-    return res;
+    if (sgu_transparencyMode == 0)
+    {
+        i.col.rgb *= alpha; // premultiply
+    }
+    else
+    {
+        uint3 coord = uint3(i.vertex.x, i.vertex.y, i.idx);
+        uint3 hash = pcg3d16(coord);
+        half cutoff = (hash.x & 0xFFFF) / 65535.0;
+        if (alpha <= cutoff)
+            discard;
+        alpha = 1;
+    }
+    o.col = half4(i.col.rgb, alpha);
+    // alpha-weighted motion
+    o.motion = (sgu_hasPrev != 0) ? (half2(i.vel) * alpha) : half2(0,0);
+    return o;
 }
 ENDCG
         }
