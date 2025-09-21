@@ -169,13 +169,13 @@ FragOut frag (v2f i)
         uint3 coord = uint3(i.vertex.x, i.vertex.y, i.idx);
         uint3 hash = pcg3d16(coord);
         half cutoff = (hash.x & 0xFFFF) / 65535.0;
+
+        o.motion = (sgu_hasPrev != 0) ? half2(i.vel) : half2(0,0);
         if (alpha <= cutoff)
             discard;
         alpha = 1;
     }
     o.col = half4(i.col.rgb, alpha);
-    // alpha-weighted motion
-    o.motion = (sgu_hasPrev != 0) ? (half2(i.vel) * alpha) : half2(0,0);
     return o;
 }
 ENDCG

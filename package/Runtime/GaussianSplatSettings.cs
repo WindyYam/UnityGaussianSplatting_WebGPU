@@ -15,7 +15,7 @@ namespace GaussianSplatting.Runtime
     public enum TemporalFilter
     {
         None,
-        TemporalNoMotion,
+        Temporal,
     }
 
     public enum DebugRenderMode
@@ -61,7 +61,7 @@ namespace GaussianSplatting.Runtime
         public int m_SortNthFrame = 1;
 
         [Tooltip("How to filter temporal transparency")]
-        public TemporalFilter m_TemporalFilter = TemporalFilter.TemporalNoMotion;
+        public TemporalFilter m_TemporalFilter = TemporalFilter.Temporal;
         [Tooltip("How much of new frame to blend in. Higher: more noise, lower: more ghosting.")]
         [Range(0.001f, 1.0f)] public float m_FrameInfluence = 0.05f;
         [Tooltip("Strength of history color rectification clamp. Lower: more flickering, higher: more blur/ghosting.")]
