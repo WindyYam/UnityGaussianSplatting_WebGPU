@@ -26,7 +26,6 @@ CGPROGRAM
 #include "GaussianSplatting.hlsl"
 
 StructuredBuffer<uint> _OrderBuffer;
-StructuredBuffer<SplatViewData> _PrevSplatViewData; // previous frame per-splat view data
 
 struct v2f
 {
@@ -44,11 +43,10 @@ cbuffer SplatGlobalUniforms // match struct SplatGlobalUniforms in C#
 {
 	uint sgu_transparencyMode;
 	uint sgu_frameOffset;
-	uint sgu_hasPrev; // 1 if previous frame data valid
-	uint sgu_pad0;
 }
 
 StructuredBuffer<SplatViewData> _SplatViewData;
+StructuredBuffer<SplatViewData> _PrevSplatViewData; // previous frame per-splat view data
 ByteAddressBuffer _SplatSelectedBits;
 uint _SplatBitsValid;
 
@@ -84,7 +82,7 @@ v2f vert (uint vtxID : SV_VertexID, uint instID : SV_InstanceID)
 
 		// motion (NDC delta) -- reconstruct previous vertex clip pos similarly
 		o.vel = 0;
-		if (sgu_transparencyMode != 0 && sgu_hasPrev != 0)
+		if (sgu_transparencyMode != 0)
 		{
 			SplatViewData prevView = _PrevSplatViewData[instID];
 			if (prevView.pos.w > 0)
@@ -172,7 +170,7 @@ FragOut frag (v2f i)
         if (alpha <= cutoff)
             discard;
         alpha = 1;
-        o.motion = (sgu_hasPrev != 0) ? half2(i.vel) : half2(0,0);
+        o.motion = half2(i.vel);
     }
     o.col = half4(i.col.rgb, alpha);
     return o;

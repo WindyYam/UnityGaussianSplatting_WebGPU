@@ -45,8 +45,6 @@ namespace GaussianSplatting.Runtime
         {
             public uint transparencyMode;
             public uint frameOffset;
-            public uint hasPrev; // 1 if previous frame view data valid
-            public uint pad; // align to 16 bytes
         }
 
         public void RegisterSplat(GaussianSplatRenderer r)
@@ -186,15 +184,7 @@ namespace GaussianSplatting.Runtime
 
             m_GlobalUniforms ??= new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, UnsafeUtility.SizeOf<SplatGlobalUniforms>());
             NativeArray<SplatGlobalUniforms> sgu = new(1, Allocator.Temp);
-            bool anyHasPrev = false;
-            foreach (var kvp in m_ActiveSplats)
-            {
-                if (kvp.Item1.m_HasPrevView)
-                {
-                    anyHasPrev = true; break;
-                }
-            }
-            sgu[0] = new SplatGlobalUniforms { transparencyMode = (uint)settings.m_Transparency, frameOffset = m_FrameOffset, hasPrev = anyHasPrev ? 1u : 0u, pad = 0 };
+            sgu[0] = new SplatGlobalUniforms { transparencyMode = (uint)settings.m_Transparency, frameOffset = m_FrameOffset};
             cmb.SetBufferData(m_GlobalUniforms, sgu);
             m_FrameOffset++;
 
