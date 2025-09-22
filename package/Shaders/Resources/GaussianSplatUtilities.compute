@@ -17,7 +17,7 @@
 #pragma kernel CSExportData
 #pragma kernel CSCopySplats
 
-#if false
+#if 0
 // DeviceRadixSort
 #pragma multi_compile __ KEY_UINT KEY_INT KEY_FLOAT
 #pragma multi_compile __ PAYLOAD_UINT PAYLOAD_INT PAYLOAD_FLOAT

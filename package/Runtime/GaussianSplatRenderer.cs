@@ -390,6 +390,7 @@ namespace GaussianSplatting.Runtime
         GraphicsBuffer m_GpuEditSelectedMouseDown; // selection state at start of operation
         GraphicsBuffer m_GpuEditPosMouseDown; // position state at start of operation
         GraphicsBuffer m_GpuEditOtherMouseDown; // rotation/scale state at start of operation
+        GraphicsBuffer m_GpuDummyBits;
 
         GpuSorting m_Sorter;
         GpuSorting.Args m_SorterArgs;
@@ -525,10 +526,17 @@ namespace GaussianSplatting.Runtime
                 m_GpuChunksValid = false;
             }
 
+            // create a small dummy bit-buffer to use as fallback for selected/deleted bit bindings
+            int selSize = (m_SplatCount + 31) / 32;
+            if (selSize < 1) selSize = 1;
+            m_GpuDummyBits = new GraphicsBuffer(GraphicsBuffer.Target.Raw | GraphicsBuffer.Target.CopySource | GraphicsBuffer.Target.CopyDestination, selSize, 4) { name = "GaussianDummyBits" };
+            ClearGraphicsBuffer(m_GpuDummyBits);
+
             m_GpuView = new GraphicsBuffer(GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource | GraphicsBuffer.Target.CopyDestination, m_Asset.splatCount, kGpuViewDataSize) { name = "GaussianViewData" };
             m_GpuViewPrev?.Dispose();
             m_GpuViewPrev = null;
-            m_HasPrevView = false;            InitSortBuffers(splatCount);
+            m_HasPrevView = false;
+            InitSortBuffers(splatCount);
         }
 
         void InitSortBuffers(int count)
@@ -591,8 +599,9 @@ namespace GaussianSplatting.Runtime
             cmb.SetComputeBufferParam(cs, kernelIndex, Props.SplatOther, m_GpuOtherData);
             cmb.SetComputeBufferParam(cs, kernelIndex, Props.SplatSH, m_GpuSHData);
             cmb.SetComputeTextureParam(cs, kernelIndex, Props.SplatColor, m_GpuColorData);
-            cmb.SetComputeBufferParam(cs, kernelIndex, Props.SplatSelectedBits, m_GpuEditSelected ?? m_GpuPosData);
-            cmb.SetComputeBufferParam(cs, kernelIndex, Props.SplatDeletedBits, m_GpuEditDeleted ?? m_GpuPosData);
+            // use dedicated dummy bits buffer as fallback to avoid aliasing the position buffer for writable bindings
+            cmb.SetComputeBufferParam(cs, kernelIndex, Props.SplatSelectedBits, m_GpuEditSelected ?? m_GpuDummyBits);
+            cmb.SetComputeBufferParam(cs, kernelIndex, Props.SplatDeletedBits, m_GpuEditDeleted ?? m_GpuDummyBits);
             cmb.SetComputeBufferParam(cs, kernelIndex, Props.SplatViewData, m_GpuView);
             cmb.SetComputeBufferParam(cs, kernelIndex, Props.OrderBuffer, m_GpuSortKeys);
 
@@ -613,8 +622,9 @@ namespace GaussianSplatting.Runtime
             mat.SetBuffer(Props.SplatOther, m_GpuOtherData);
             mat.SetBuffer(Props.SplatSH, m_GpuSHData);
             mat.SetTexture(Props.SplatColor, m_GpuColorData);
-            mat.SetBuffer(Props.SplatSelectedBits, m_GpuEditSelected ?? m_GpuPosData);
-            mat.SetBuffer(Props.SplatDeletedBits, m_GpuEditDeleted ?? m_GpuPosData);
+            // use dummy as fallback for material bindings as well
+            mat.SetBuffer(Props.SplatSelectedBits, m_GpuEditSelected ?? m_GpuDummyBits);
+            mat.SetBuffer(Props.SplatDeletedBits, m_GpuEditDeleted ?? m_GpuDummyBits);
             mat.SetInt(Props.SplatBitsValid, m_GpuEditSelected != null && m_GpuEditDeleted != null ? 1 : 0);
             uint format = (uint)m_Asset.posFormat | ((uint)m_Asset.scaleFormat << 8) | ((uint)m_Asset.shFormat << 16);
             mat.SetInteger(Props.SplatFormat, (int)format);
@@ -637,8 +647,10 @@ namespace GaussianSplatting.Runtime
             DisposeBuffer(ref m_GpuOtherData);
             DisposeBuffer(ref m_GpuSHData);
             DisposeBuffer(ref m_GpuChunks);
+            DisposeBuffer(ref m_GpuDummyBits);
 
             DisposeBuffer(ref m_GpuView);
+            DisposeBuffer(ref m_GpuViewPrev);
             DisposeBuffer(ref m_GpuSortDistances);
             DisposeBuffer(ref m_GpuSortKeys);
 
@@ -894,6 +906,14 @@ namespace GaussianSplatting.Runtime
                 ClearGraphicsBuffer(m_GpuEditSelected);
                 ClearGraphicsBuffer(m_GpuEditSelectedMouseDown);
                 ClearGraphicsBuffer(m_GpuEditDeleted);
+
+                // ensure dummy bits buffer matches the selection buffer size to avoid binding the position buffer as fallback
+                if (m_GpuDummyBits == null || m_GpuDummyBits.count != size)
+                {
+                    m_GpuDummyBits?.Dispose();
+                    m_GpuDummyBits = new GraphicsBuffer(target, size, 4) { name = "GaussianDummyBits" };
+                    ClearGraphicsBuffer(m_GpuDummyBits);
+                }
             }
             return m_GpuEditSelected != null;
         }
@@ -1117,8 +1137,14 @@ namespace GaussianSplatting.Runtime
             ClearGraphicsBuffer(newEditSelectedMouseDown);
             ClearGraphicsBuffer(newEditDeleted);
 
+            // replace / resize dummy bits buffer to match new selection buffer size
+            m_GpuDummyBits?.Dispose();
+            m_GpuDummyBits = new GraphicsBuffer(selTarget, selSize, 4) { name = "GaussianDummyBits" };
+            ClearGraphicsBuffer(m_GpuDummyBits);
+
             var newGpuView = new GraphicsBuffer(GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource | GraphicsBuffer.Target.CopyDestination, newSplatCount, kGpuViewDataSize) { name = "GaussianViewData" };
-            var newGpuViewPrev = new GraphicsBuffer(GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource | GraphicsBuffer.Target.CopyDestination, newSplatCount, kGpuViewDataSize) { name = "GaussianViewDataPrev" };            InitSortBuffers(newSplatCount);
+            var newGpuViewPrev = new GraphicsBuffer(GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource | GraphicsBuffer.Target.CopyDestination, newSplatCount, kGpuViewDataSize) { name = "GaussianViewDataPrev" };
+            InitSortBuffers(newSplatCount);
 
             // copy existing data over into new buffers
             EditCopySplats(transform, newPosData, newOtherData, newSHData, newColorData, newEditDeleted, newSplatCount, 0, 0, m_SplatCount);
