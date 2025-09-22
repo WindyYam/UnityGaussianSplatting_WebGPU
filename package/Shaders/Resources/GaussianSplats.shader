@@ -162,7 +162,7 @@ FragOut frag (v2f i)
     {
         i.col.rgb *= alpha; // premultiply
     }
-    else
+    else if(sgu_transparencyMode == 1)
     {
         uint3 coord = uint3(i.vertex.x, i.vertex.y, i.idx);
         uint3 hash = pcg3d16(coord);
@@ -172,6 +172,38 @@ FragOut frag (v2f i)
         alpha = 1;
         o.motion = half2(i.vel);
     }
+    else
+    {
+        // Halftone ordered dither (4x4 Bayer) for stable stochastic-like transparency.
+        // Use screen-space integer pixel coordinates and a small per-instance offset
+        // to decorrelate neighboring splats. This is deterministic across frames,
+        // reducing temporal flicker compared to random sampling.
+        uint2 p = uint2(i.vertex.xy); // truncate to integer pixel coords
+        uint bx = p.x & 3u;
+        uint by = p.y & 3u;
+
+        // Apply a small per-splat offset to the dither tile to reduce repeating artifacts.
+        uint inst = i.idx;
+        bx = (bx + (inst & 3u)) & 3u;
+        by = (by + ((inst >> 2) & 3u)) & 3u;
+
+        // 4x4 Bayer matrix values 0..15
+        const uint bayer4[16] = {
+            0u, 8u, 2u, 10u,
+            12u,4u,14u,6u,
+            3u,11u,1u,9u,
+            15u,7u,13u,5u
+        };
+        uint t = bayer4[bx + (by << 2)];
+        half cutoff = (t + 0.5) / 16.0;
+
+        // Binary decision: keep pixel if alpha exceeds threshold, otherwise discard.
+        if (alpha <= cutoff)
+            discard;
+        alpha = 1;
+        o.motion = half2(i.vel);
+    }
+
     o.col = half4(i.col.rgb, alpha);
     return o;
 }

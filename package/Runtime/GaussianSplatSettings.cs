@@ -10,6 +10,8 @@ namespace GaussianSplatting.Runtime
         SortedBlended,
         // no sorting, transparency is stochastic (random) and noisy
         Stochastic,
+        // no sorting, transparency is stochastic (half tone) and less noisy
+        StochasticHalfTone,
     }
 
     public enum TemporalFilter

@@ -188,7 +188,7 @@ namespace GaussianSplatting.Runtime
             cmb.SetBufferData(m_GlobalUniforms, sgu);
             m_FrameOffset++;
 
-            bool stochastic = !settings.isDebugRender && settings.m_Transparency == TransparencyMode.Stochastic;
+            bool stochastic = !settings.isDebugRender && settings.m_Transparency != TransparencyMode.SortedBlended;
             displayMat.SetInt(GaussianSplatRenderer.Props.SrcBlend, (int)(stochastic ? BlendMode.One : BlendMode.OneMinusDstAlpha));
             displayMat.SetInt(GaussianSplatRenderer.Props.DstBlend, (int)(stochastic ? BlendMode.Zero : BlendMode.One));
             displayMat.SetInt(GaussianSplatRenderer.Props.ZWrite, stochastic ? 1 : 0);
@@ -300,7 +300,7 @@ namespace GaussianSplatting.Runtime
             GaussianSplatSettings settings = GaussianSplatSettings.instance;
             if (!settings.isDebugRender)
             {
-                bool useTemporal = settings.m_Transparency == TransparencyMode.Stochastic && settings.m_TemporalFilter != TemporalFilter.None;
+                bool useTemporal = settings.m_Transparency != TransparencyMode.SortedBlended && settings.m_TemporalFilter != TemporalFilter.None;
                 m_CommandBuffer.GetTemporaryRT(GaussianSplatRenderer.Props.GaussianSplatRT, -1, -1, 0, FilterMode.Point, GraphicsFormat.R16G16B16A16_SFloat);
                 if (useTemporal)
                 {
@@ -328,7 +328,7 @@ namespace GaussianSplatting.Runtime
             if (!settings.isDebugRender)
             {
                 m_CommandBuffer.BeginSample(s_ProfCompose);
-                if (settings.m_Transparency == TransparencyMode.Stochastic && settings.m_TemporalFilter != TemporalFilter.None)
+                if (settings.m_Transparency != TransparencyMode.SortedBlended && settings.m_TemporalFilter != TemporalFilter.None)
                 {
                     m_TemporalFilter ??= new GaussianSplatTemporalFilter();
                     // Pass the motion RT ID to the temporal filter (overload to be added there)
@@ -346,7 +346,7 @@ namespace GaussianSplatting.Runtime
                 }
                 m_CommandBuffer.EndSample(s_ProfCompose);
                 m_CommandBuffer.ReleaseTemporaryRT(GaussianSplatRenderer.Props.GaussianSplatRT);
-                if (settings.m_Transparency == TransparencyMode.Stochastic && settings.m_TemporalFilter != TemporalFilter.None)
+                if (settings.m_Transparency != TransparencyMode.SortedBlended && settings.m_TemporalFilter != TemporalFilter.None)
                     m_CommandBuffer.ReleaseTemporaryRT(GaussianSplatRenderer.Props.GaussianSplatMotionRT);
             }
         }
