@@ -41,7 +41,7 @@ namespace GaussianSplatting.Editor
             {
                 EditorGUILayout.PropertyField(m_SortNthFrame);
             }
-            if (m_Transparency.intValue == (int) TransparencyMode.Stochastic)
+            if (m_Transparency.intValue != (int) TransparencyMode.SortedBlended)
             {
                 EditorGUILayout.PropertyField(m_TemporalFilter);
                 if (m_TemporalFilter.intValue != (int)TemporalFilter.None)
