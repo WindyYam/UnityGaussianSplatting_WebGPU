@@ -546,33 +546,37 @@ namespace GaussianSplatting.Runtime
             m_SorterArgs.resources.Dispose();
 
             EnsureSorterAndRegister();
+            if (GaussianSplatSettings.instance.m_Transparency == TransparencyMode.SortedBlended)
+            {
+                m_GpuSortDistances = new GraphicsBuffer(GraphicsBuffer.Target.Structured, count, 4) { name = "GaussianSplatSortDistances" };
+                m_GpuSortKeys = new GraphicsBuffer(GraphicsBuffer.Target.Structured, count, 4) { name = "GaussianSplatSortIndices" };
 
-            m_GpuSortDistances = new GraphicsBuffer(GraphicsBuffer.Target.Structured, count, 4) { name = "GaussianSplatSortDistances" };
-            m_GpuSortKeys = new GraphicsBuffer(GraphicsBuffer.Target.Structured, count, 4) { name = "GaussianSplatSortIndices" };
+                // init keys buffer to splat indices
+                ComputeShader cs = GaussianSplatSettings.instance.csUtilities;
+                cs.SetBuffer((int)KernelIndices.SetIndices, Props.SplatSortKeys, m_GpuSortKeys);
+                cs.SetInt(Props.SplatCount, m_GpuSortDistances.count);
+                cs.GetKernelThreadGroupSizes((int)KernelIndices.SetIndices, out uint gsX, out _, out _);
+                cs.Dispatch((int)KernelIndices.SetIndices, (m_GpuSortDistances.count + (int)gsX - 1) / (int)gsX, 1, 1);
 
-            // init keys buffer to splat indices
-            ComputeShader cs = GaussianSplatSettings.instance.csUtilities;
-            cs.SetBuffer((int)KernelIndices.SetIndices, Props.SplatSortKeys, m_GpuSortKeys);
-            cs.SetInt(Props.SplatCount, m_GpuSortDistances.count);
-            cs.GetKernelThreadGroupSizes((int)KernelIndices.SetIndices, out uint gsX, out _, out _);
-            cs.Dispatch((int)KernelIndices.SetIndices, (m_GpuSortDistances.count + (int)gsX - 1)/(int)gsX, 1, 1);
-
-            m_SorterArgs.inputKeys = m_GpuSortDistances;
-            m_SorterArgs.inputValues = m_GpuSortKeys;
-            m_SorterArgs.count = (uint)count;
-            if (GaussianSplatSettings.instance.m_Transparency == TransparencyMode.SortedBlended && m_Sorter.Valid)
-                m_SorterArgs.resources = GpuSorting.SupportResources.Load((uint)count);
+                m_SorterArgs.inputKeys = m_GpuSortDistances;
+                m_SorterArgs.inputValues = m_GpuSortKeys;
+                m_SorterArgs.count = (uint)count;
+                if (m_Sorter.Valid)
+                    m_SorterArgs.resources = GpuSorting.SupportResources.Load((uint)count);
+            }
         }
 
         bool resourcesAreSetUp => GaussianSplatSettings.instance.resourcesFound;
 
         public void EnsureSorterAndRegister()
         {
-            if (GaussianSplatSettings.instance.m_Transparency == TransparencyMode.SortedBlended && m_Sorter == null && resourcesAreSetUp)
+            if (GaussianSplatSettings.instance.m_Transparency == TransparencyMode.SortedBlended)
             {
-                m_Sorter = new GpuSorting(GaussianSplatSettings.instance.csUtilities);
+                if (m_Sorter == null && resourcesAreSetUp)
+                {
+                    m_Sorter = new GpuSorting(GaussianSplatSettings.instance.csUtilities);
+                }
             }
-
             if (!m_Registered && resourcesAreSetUp)
             {
                 GaussianSplatRenderSystem.instance.RegisterSplat(this);

@@ -21,7 +21,6 @@ CGPROGRAM
 #pragma vertex vert
 #pragma fragment frag
 #pragma require compute
-#pragma use_dxc
 
 #include "GaussianSplatting.hlsl"
 
@@ -194,9 +193,7 @@ FragOut frag (v2f i)
             3u,11u,1u,9u,
             15u,7u,13u,5u
         };
-        // Add a shift to the LUT index based on instance and frame offset
-        uint shift = (sgu_frameOffset) & 15u;
-        uint t = bayer4[(bx + (by << 2) + shift) & 15u];
+        uint t = bayer4[bx + (by << 2)];
         half cutoff = (t + 0.5) / 16.0;
 
         // Binary decision: keep pixel if alpha exceeds threshold, otherwise discard.
