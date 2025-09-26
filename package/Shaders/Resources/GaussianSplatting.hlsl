@@ -650,4 +650,9 @@ void FlipProjectionIfBackbuffer(inout float4 vpos)
         vpos.y = -vpos.y;
 }
 
+void FlipMotionIfBackbuffer(inout float2 vpos)
+{
+    if (_CameraTargetTexture_TexelSize.z == 1.0)
+        vpos.y = -vpos.y;
+}
 #endif // GAUSSIAN_SPLATTING_HLSL

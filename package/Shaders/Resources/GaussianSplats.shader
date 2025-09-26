@@ -92,6 +92,7 @@ v2f vert (uint vtxID : SV_VertexID, uint instID : SV_InstanceID)
 				float2 ndcCurr = o.vertex.xy / max(o.vertex.w, 1e-6);
 				float2 ndcPrev = prevClipPos.xy / max(prevClipPos.w, 1e-6);
 				o.vel = ndcCurr - ndcPrev; // current - previous
+                FlipMotionIfBackbuffer(o.vel);
 			}
 		}
 
