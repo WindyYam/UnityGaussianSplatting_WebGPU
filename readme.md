@@ -1,5 +1,5 @@
 # Unity Gaussian Splatting (WebGPU Fork)
-**DEPRECATED** moved to https://github.com/WindyYam/UnityGaussianSplatting_WebGPU_Export for better visibility.
+**DEPRECATED** moved to https://github.com/WindyYam/UnityGaussianSplatting_WebGPU_Export for better visibility.   
 **Live Demo:** https://windyyam.github.io/unity_splat_test_deploy/
 
 A WebGPU-focused fork of [aras-p/UnityGaussianSplatting](https://github.com/aras-p/UnityGaussianSplatting) optimized for high-fidelity Gaussian splat rendering on web platforms and constrained environments.
